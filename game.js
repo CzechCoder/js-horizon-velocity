@@ -8,25 +8,37 @@ function resizeCanvas() {
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
-const ROAD_WIDTH = 4000;
+// Rendering
 const SEGMENT_LENGTH = 35; // Vertical length of each road segment
+const NUM_SEGMENTS = Math.ceil(canvas.height / SEGMENT_LENGTH) + 10; // How many segments are rendered in each cycle
+const ROAD_WIDTH = 4000;
 const CAMERA_DEPTH = 40;
 const CAMERA_HEIGHT = 800;
-const NUM_SEGMENTS = 300; // How many segments are rendered in each cycle
 const SPEED = 250; // Units per second
 
-let position = 0;
-let carX = canvas.width / 2; // Car's position
+// Car
+const carSpeed = 8;
 const carWidth = 350;
 const carHeight = 188;
-const carSpeed = 8;
+let carX = canvas.width / 2; // Car's position
 
-const carImage = new Image();
-carImage.src = "image/car_am.png";
+const carImages = {
+  straight: new Image(),
+  left: new Image(),
+  right: new Image(),
+};
+
+carImages.straight.src = "image/car_am.png";
+carImages.left.src = "image/car_am_left.png";
+carImages.right.src = "image/car_am_right.png";
+
+let currentCarImage = carImages.straight;
+
+let position = 0;
 
 // Project function to project road segments
 function project(z) {
-  const dz = z - position;
+  const dz = Math.max(z - position, 0.01);
 
   if (dz <= 0.01) return null; // avoid dividing by zero or negative distances
 
@@ -40,7 +52,7 @@ function project(z) {
   const width = clampedScale * ROAD_WIDTH;
 
   // Calculate how far the road reaches down the screen
-  const roadY = y - 8;
+  const roadY = y - 15;
 
   // Ensure the road doesn't disappear above the horizon, just stretches to the bottom
   return { x, y: roadY, width };
@@ -92,20 +104,30 @@ function drawRoad() {
 function drawCar() {
   const y = canvas.height - carHeight - 20;
 
-  if (carImage.complete) {
-    ctx.drawImage(carImage, carX - carWidth / 2, y, carWidth, carHeight); // Draw the car
+  if (currentCarImage.complete) {
+    ctx.drawImage(currentCarImage, carX - carWidth / 2, y, carWidth, carHeight); // Draw the car
   }
 }
 
+const keys = {};
+
+document.addEventListener("keydown", (e) => (keys[e.key] = true));
+document.addEventListener("keyup", (e) => (keys[e.key] = false));
+
 // Controls
-function handleInput() {
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowLeft" || e.key === "a") {
-      carX -= carSpeed;
-    } else if (e.key === "ArrowRight" || e.key === "d") {
-      carX += carSpeed;
-    }
-  });
+function handleInput(dt) {
+  const turningLeft = keys["ArrowLeft"] || keys["a"];
+  const turningRight = keys["ArrowRight"] || keys["d"];
+
+  if (turningLeft) {
+    carX -= carSpeed * dt * 60;
+    currentCarImage = carImages.left;
+  } else if (turningRight) {
+    carX += carSpeed * dt * 60;
+    currentCarImage = carImages.right;
+  } else {
+    currentCarImage = carImages.straight;
+  }
 }
 
 // Limit the car's boundaries
@@ -133,11 +155,11 @@ function frame(time) {
   drawBackground();
   drawRoad();
   drawCar();
+  handleInput(dt);
 
   requestAnimationFrame(frame);
 }
 
-handleInput();
 requestAnimationFrame(frame);
 
 // original code
