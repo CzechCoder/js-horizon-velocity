@@ -13,17 +13,13 @@ const SEGMENT_LENGTH = 35; // Vertical length of each road segment
 const CAMERA_DEPTH = 40;
 const CAMERA_HEIGHT = 800;
 const NUM_SEGMENTS = 300; // How many segments are rendered in each cycle
-const SPEED = 200; // Units per second
+const SPEED = 250; // Units per second
 
 let position = 0;
-let carX = canvas.width / 2;
-const carSpeed = 5;
-
-const road = Array.from({ length: NUM_SEGMENTS }, (_, i) => ({
-  index: i,
-  z: i * SEGMENT_LENGTH,
-  color: i % 2 === 0 ? "#707070" : "#606060",
-}));
+let carX = canvas.width / 2; // Car's position
+const carWidth = 350;
+const carHeight = 188;
+const carSpeed = 8;
 
 const carImage = new Image();
 carImage.src = "image/car_am.png";
@@ -71,27 +67,29 @@ function drawBackground() {
   ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
 }
 
+function getSegmentColor(index) {
+  return index % 2 === 0 ? "#707070" : "#606060";
+}
+
 // Draw the road based on the current position
 function drawRoad() {
-  const baseIndex = Math.floor(position / SEGMENT_LENGTH);
+  const baseZ = Math.floor(position / SEGMENT_LENGTH) * SEGMENT_LENGTH;
 
-  for (let n = NUM_SEGMENTS + 70; n > 0; n--) {
-    const curr = road[(baseIndex + n) % NUM_SEGMENTS];
-    const next = road[(baseIndex + n + 1) % NUM_SEGMENTS];
+  for (let n = NUM_SEGMENTS + 20; n > 0; n--) {
+    const z1 = baseZ + n * SEGMENT_LENGTH;
+    const z2 = baseZ + (n + 1) * SEGMENT_LENGTH;
 
-    const p1 = project(curr.z);
-    const p2 = project(next.z);
+    const p1 = project(z1);
+    const p2 = project(z2);
 
     if (p1 && p2) {
-      drawSegment(p1, p2, curr.color);
+      drawSegment(p1, p2, getSegmentColor(n));
     }
   }
 }
 
 // Draw the car on the road
 function drawCar() {
-  const carWidth = 350;
-  const carHeight = 188;
   const y = canvas.height - carHeight - 20;
 
   if (carImage.complete) {
@@ -99,6 +97,7 @@ function drawCar() {
   }
 }
 
+// Controls
 function handleInput() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft" || e.key === "a") {
@@ -107,9 +106,14 @@ function handleInput() {
       carX += carSpeed;
     }
   });
+}
 
-  if (carX < 0) carX = 0;
-  if (carX > canvas.width) carX = canvas.width;
+// Limit the car's boundaries
+function clampCarPosition() {
+  const minX = carWidth / 2;
+  const maxX = canvas.width - carWidth / 2;
+
+  carX = Math.max(minX, Math.min(carX, maxX));
 }
 
 let lastTime = null;
@@ -123,6 +127,8 @@ function frame(time) {
   position += SPEED * dt;
   position %= NUM_SEGMENTS * SEGMENT_LENGTH;
 
+  clampCarPosition();
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawBackground();
   drawRoad();
@@ -133,3 +139,5 @@ function frame(time) {
 
 handleInput();
 requestAnimationFrame(frame);
+
+// original code
