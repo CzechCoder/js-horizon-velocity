@@ -1,9 +1,25 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+const VIRTUAL_WIDTH = 1280;
+const VIRTUAL_HEIGHT = 720;
+
 function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  const aspect = 16 / 9;
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+
+  if (width / height > aspect) {
+    width = height * aspect;
+  } else {
+    height = width / aspect;
+  }
+
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  canvas.width = VIRTUAL_WIDTH;
+  canvas.height = VIRTUAL_HEIGHT;
 }
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
@@ -20,7 +36,7 @@ const SPEED = 250; // Units per second
 const carSpeed = 8;
 const carWidth = 350;
 const carHeight = 188;
-let carX = canvas.width / 2; // Car's position
+let carX = VIRTUAL_WIDTH / 2; // Car's position
 
 const carImages = {
   straight: new Image(),
@@ -52,14 +68,14 @@ function project(z) {
   const width = clampedScale * ROAD_WIDTH;
 
   // Calculate how far the road reaches down the screen
-  const roadY = y - 15;
+  const roadY = y - 18;
 
   // Ensure the road doesn't disappear above the horizon, just stretches to the bottom
   return { x, y: roadY, width };
 }
 
 // Draw each segment of the road
-function drawSegment(p1, p2, color) {
+function drawSegment(p1, p2, color, index) {
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(p1.x - p1.width / 2, p1.y);
@@ -68,6 +84,61 @@ function drawSegment(p1, p2, color) {
   ctx.lineTo(p2.x - p2.width / 2, p2.y);
   ctx.closePath();
   ctx.fill();
+
+  const rumbleWidth1 = p1.width * 0.1;
+  const laneWidth1 = (p1.width - 2 * rumbleWidth1) / 3;
+
+  const rumbleWidth2 = p2.width * 0.1;
+  const laneWidth2 = (p2.width - 2 * rumbleWidth2) / 3;
+
+  // Left rumble strip
+  ctx.fillStyle = index % 2 === 0 ? "#ff0000" : "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(p1.x - p1.width / 2, p1.y);
+  ctx.lineTo(p1.x - p1.width / 2 + rumbleWidth1, p1.y);
+  ctx.lineTo(p2.x - p2.width / 2 + rumbleWidth2, p2.y);
+  ctx.lineTo(p2.x - p2.width / 2, p2.y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Right rumble strip
+  ctx.beginPath();
+  ctx.moveTo(p1.x + p1.width / 2 - rumbleWidth1, p1.y);
+  ctx.lineTo(p1.x + p1.width / 2, p1.y);
+  ctx.lineTo(p2.x + p2.width / 2, p2.y);
+  ctx.lineTo(p2.x + p2.width / 2 - rumbleWidth2, p2.y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Lane markers (dashed white lines)
+  ctx.fillStyle = "#ffffff";
+
+  const dashWidth1 = Math.max(4, p1.width * 0.01);
+  const dashWidth2 = Math.max(4, p2.width * 0.01);
+
+  const dashEveryN = 3;
+  if (index % dashEveryN === 0) {
+    for (let i = 1; i < 3; i++) {
+      const x1a =
+        p1.x - p1.width / 2 + rumbleWidth1 + laneWidth1 * i - dashWidth1 / 2;
+      const x1b =
+        p1.x - p1.width / 2 + rumbleWidth1 + laneWidth1 * i + dashWidth1 / 2;
+      const x2a =
+        p2.x - p2.width / 2 + rumbleWidth2 + laneWidth2 * i - dashWidth2 / 2;
+      const x2b =
+        p2.x - p2.width / 2 + rumbleWidth2 + laneWidth2 * i + dashWidth2 / 2;
+
+      ctx.beginPath();
+      ctx.moveTo(x1a, p1.y);
+      ctx.lineTo(x1b, p1.y);
+      ctx.lineTo(x2b, p2.y);
+      ctx.lineTo(x2a, p2.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  ctx.setLineDash([]); // Reset dash
 }
 
 // Draw the background (sky and grass)
@@ -95,7 +166,10 @@ function drawRoad() {
     const p2 = project(z2);
 
     if (p1 && p2) {
-      drawSegment(p1, p2, getSegmentColor(n));
+      const segmentIndex = Math.floor(
+        (position + n * SEGMENT_LENGTH) / SEGMENT_LENGTH
+      );
+      drawSegment(p1, p2, getSegmentColor(segmentIndex), segmentIndex);
     }
   }
 }
@@ -133,7 +207,7 @@ function handleInput(dt) {
 // Limit the car's boundaries
 function clampCarPosition() {
   const minX = carWidth / 2;
-  const maxX = canvas.width - carWidth / 2;
+  const maxX = VIRTUAL_WIDTH - carWidth / 2;
 
   carX = Math.max(minX, Math.min(carX, maxX));
 }
