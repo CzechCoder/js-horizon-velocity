@@ -31,10 +31,16 @@ const NUM_SEGMENTS = Math.ceil(canvas.height / SEGMENT_LENGTH) + 10; // How many
 const ROAD_WIDTH = 4000;
 const CAMERA_DEPTH = 40;
 const CAMERA_HEIGHT = 800;
-const SPEED = 350; // Units per second
+const SPEED = 800; // Units per second
+
+// Game variables
+let position = 0; // Camera position
+let elapsedTime = 0; // Seconds
+let score = 0;
+let paused = false; // Game is paused?
 
 // Car
-const carSpeed = 8;
+const carSpeed = 10;
 const carWidth = 350;
 const carHeight = 188;
 let carX = VIRTUAL_WIDTH / 2; // Car's horizontal position
@@ -52,6 +58,9 @@ carImages.right.src = "image/car_am_right.png";
 
 let currentCarImage = carImages.straight;
 
+const logoImage = new Image();
+logoImage.src = "image/shvt_logo.png";
+
 const treeImage = new Image();
 treeImage.src = "image/tree.png";
 
@@ -64,7 +73,17 @@ for (let i = 0; i < 100; i++) {
   });
 }
 
-let position = 0; // Camera position
+const trafficCarImage = new Image();
+trafficCarImage.src = "image/traffic_car_am.png";
+
+const trafficCars = [];
+
+for (let i = 0; i < 10; i++) {
+  trafficCars.push({
+    z: i * 800 + 1000, // Always start ahead of the player
+    lane: Math.floor(Math.random() * 3), // Based on the number of lanes (1 -3)
+  });
+}
 
 // Project function to project road segments
 function project(z) {
@@ -226,6 +245,48 @@ function drawTrees() {
   }
 }
 
+function getLaneWorldX(laneIndex) {
+  const totalLanes = 3;
+  const rumbleFraction = 0.1;
+  const pavedWidth = ROAD_WIDTH * (1 - rumbleFraction * 2);
+  const laneWidth = pavedWidth / totalLanes;
+
+  const startX = -ROAD_WIDTH / 2 + ROAD_WIDTH * rumbleFraction;
+
+  return startX + laneWidth * (laneIndex + 0.5); // Center of the lane
+}
+
+function drawTrafficCars() {
+  const sortedTraffic = [...trafficCars].sort((a, b) => b.z - a.z);
+
+  for (let car of sortedTraffic) {
+    const projected = project(car.z); // Project the car position
+    if (!projected) continue;
+
+    const worldX = getLaneWorldX(car.lane);
+    const scale = CAMERA_DEPTH / (car.z - position);
+    const screenX = canvas.width / 2 + scale * worldX;
+
+    const carHeight = scale * 450; // Scale the car based on distance
+    const carWidth =
+      carHeight * (trafficCarImage.width / trafficCarImage.height);
+
+    // Adjust the car's Y position using the same logic for the road (projected.y)
+    const screenY = projected.y;
+
+    // Only render the car if it's on or below the horizon
+    if (screenY >= canvas.height / 2) {
+      ctx.drawImage(
+        trafficCarImage,
+        screenX - carWidth / 2,
+        screenY - carHeight,
+        carWidth,
+        carHeight
+      );
+    }
+  }
+}
+
 // Draw the car on the road
 function drawCar() {
   const y = canvas.height - carHeight - 20;
@@ -235,9 +296,66 @@ function drawCar() {
   }
 }
 
+// Draw the pause menu
+function drawPauseMenu() {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "48px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Paused", canvas.width / 2, canvas.height / 2 - 20);
+  ctx.font = "24px sans-serif";
+  ctx.fillText(
+    "Press 'P' or 'Escape' to resume",
+    canvas.width / 2,
+    canvas.height / 2 + 30
+  );
+}
+
+function drawHUD() {
+  ctx.font = "28px sans-serif";
+  ctx.textAlign = "left";
+
+  // Time label
+  ctx.fillStyle = "black";
+  ctx.fillText("Time:", 40, 50);
+  ctx.fillStyle = "white";
+  ctx.fillText(formatTime(elapsedTime), 120, 50);
+
+  // Score label
+  ctx.fillStyle = "black";
+  ctx.fillText("Score:", 220, 50);
+  ctx.fillStyle = "white";
+  ctx.fillText(score.toString(), 310, 50);
+
+  // Logo
+  const logoHeight = 80; // Adjustable logo height
+  const logoWidth = logoHeight * (logoImage.width / logoImage.height);
+  ctx.drawImage(
+    logoImage,
+    canvas.width / 2 - logoWidth / 2,
+    10,
+    logoWidth,
+    logoHeight
+  );
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+}
+
+// Listeners
 const keys = {};
 
-document.addEventListener("keydown", (e) => (keys[e.key] = true));
+document.addEventListener("keydown", (e) => {
+  keys[e.key] = true;
+  if (e.key === "Escape" || e.key === "p") {
+    paused = !paused;
+  }
+});
 document.addEventListener("keyup", (e) => (keys[e.key] = false));
 
 // Controls
@@ -272,6 +390,24 @@ function frame(time) {
   const dt = (time - lastTime) / 1000;
   lastTime = time;
 
+  // Clear frame
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawBackground();
+  drawTrees();
+  drawRoad();
+  drawTrafficCars();
+  drawCar();
+  drawHUD();
+
+  if (paused) {
+    drawPauseMenu();
+    requestAnimationFrame(frame);
+    return;
+  }
+
+  elapsedTime += dt;
+  score += Math.floor(SPEED * dt * 0.1); // Last number is multiplier
   position += SPEED * dt;
 
   for (let tree of trees) {
@@ -280,14 +416,15 @@ function frame(time) {
     }
   }
 
-  clampCarPosition();
+  for (let car of trafficCars) {
+    if (car.z < position) {
+      car.z += 10000 + Math.random() * 5000;
+      car.lane = Math.floor(Math.random() * 3);
+    }
+  }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawBackground();
-  drawTrees();
-  drawRoad();
-  drawCar();
   handleInput(dt);
+  clampCarPosition();
 
   requestAnimationFrame(frame);
 }
