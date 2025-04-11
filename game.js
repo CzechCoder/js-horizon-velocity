@@ -329,6 +329,11 @@ function drawHUD() {
   ctx.fillStyle = "white";
   ctx.fillText(score.toString(), 310, 50);
 
+  // "Made by" label
+  ctx.fillStyle = "#bcbcbc";
+  ctx.font = "15px arial";
+  ctx.fillText("Made by Tomas Burian, 2025", 40, canvas.height - 20);
+
   // Logo
   const logoHeight = 80; // Adjustable logo height
   const logoWidth = logoHeight * (logoImage.width / logoImage.height);
