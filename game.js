@@ -38,6 +38,7 @@ let position = 0;
 let elapsedTime = 0; // Seconds
 let score = 0;
 let paused = false;
+let crashed = false;
 let cloudOffset = 0;
 let skylineOffset = 0;
 let treeOffset = 0;
@@ -294,14 +295,8 @@ function drawTrees() {
 }
 
 function getLaneWorldX(laneIndex) {
-  const totalLanes = 3;
-  const rumbleFraction = 0.1;
-  const pavedWidth = ROAD_WIDTH * (1 - rumbleFraction * 2);
-  const laneWidth = pavedWidth / totalLanes;
-
-  const startX = -ROAD_WIDTH / 2 + ROAD_WIDTH * rumbleFraction;
-
-  return startX + laneWidth * (laneIndex + 0.5);
+  const laneWidth = ROAD_WIDTH / 3;
+  return -ROAD_WIDTH / 2 + laneWidth * (laneIndex + 0.5); // Center of each lane
 }
 
 function drawTrafficCars() {
@@ -360,6 +355,24 @@ function drawPauseMenu() {
   );
 }
 
+function drawCrashScreen() {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#ff3333";
+  ctx.font = "64px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("You Crashed!", canvas.width / 2, canvas.height / 2 - 20);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "28px sans-serif";
+  ctx.fillText(
+    "Press 'R' to restart",
+    canvas.width / 2,
+    canvas.height / 2 + 40
+  );
+}
+
 function drawHUD() {
   ctx.font = "28px sans-serif";
   ctx.textAlign = "left";
@@ -399,10 +412,16 @@ const keys = {};
 
 document.addEventListener("keydown", (e) => {
   keys[e.key] = true;
+
   if (e.key === "Escape" || e.key === "p") {
-    paused = !paused;
+    if (!crashed) paused = !paused;
+  }
+
+  if (e.key === "r" && crashed) {
+    restartGame();
   }
 });
+
 document.addEventListener("keyup", (e) => (keys[e.key] = false));
 
 function handleInput(dt) {
@@ -428,6 +447,87 @@ function clampCarPosition() {
   carX = Math.max(minX, Math.min(carX, maxX));
 }
 
+function getPlayerLane() {
+  // Define lane boundaries in screen space (approximate)
+  const laneWidth = ROAD_WIDTH / 3;
+  const screenLaneWidth = (laneWidth * CAMERA_DEPTH) / (position + 1000); // Adjust 1000 empirically
+
+  // Convert player's X position to a lane index (0=left, 1=middle, 2=right)
+  const lane = Math.floor(
+    (carX - (canvas.width / 2 - screenLaneWidth * 1.5)) / screenLaneWidth
+  );
+  return Math.max(0, Math.min(2, lane)); // Clamp to 0-2
+}
+
+function getTrafficCarWorldX(lane) {
+  const totalLanes = 3;
+  const laneWidth = ROAD_WIDTH / totalLanes;
+  const startX = -ROAD_WIDTH / 2; // Leftmost part of the road
+
+  return startX + lane * laneWidth + laneWidth / 2; // X position of traffic car based on its lane
+}
+
+function checkCollisions() {
+  const playerY = canvas.height - carHeight - 20;
+  const playerLeft = carX - carWidth / 2;
+  const playerRight = carX + carWidth / 2;
+
+  for (let car of trafficCars) {
+    const dz = car.z - position;
+    if (dz <= 0 || dz > 150) continue; // Only check cars "close" to the player
+
+    const projected = project(car.z);
+    if (!projected) continue;
+
+    const trafficWorldX = getLaneWorldX(car.lane);
+    const scale = CAMERA_DEPTH / dz;
+    const trafficScreenX = canvas.width / 2 + scale * trafficWorldX;
+    const trafficWidth = scale * 350;
+    const trafficHeight = scale * 188;
+    const trafficScreenY = projected.y - trafficHeight;
+
+    // Bounding box collision check (pixel-perfect)
+    const trafficLeft = trafficScreenX - trafficWidth / 2;
+    const trafficRight = trafficScreenX + trafficWidth / 2;
+
+    if (
+      playerRight > trafficLeft &&
+      playerLeft < trafficRight &&
+      playerY + carHeight > trafficScreenY &&
+      playerY < trafficScreenY + trafficHeight
+    ) {
+      handleCrash();
+      break;
+    }
+  }
+}
+
+function handleCrash() {
+  paused = true;
+  crashed = true;
+}
+
+function restartGame() {
+  position = 0;
+  elapsedTime = 0;
+  score = 0;
+  carX = VIRTUAL_WIDTH / 2;
+  crashed = false;
+  paused = false;
+
+  for (let i = 0; i < trafficCars.length; i++) {
+    trafficCars[i].z = i * 800 + 1000;
+    trafficCars[i].lane = Math.floor(Math.random() * 3);
+  }
+
+  for (let i = 0; i < 100; i++) {
+    trees.push({
+      z: i * 200,
+      x: i % 2 === 0 ? -3000 : 3000,
+    });
+  }
+}
+
 let lastTime = null;
 
 // Main animation loop
@@ -445,6 +545,13 @@ function frame(time) {
   drawTrafficCars();
   drawCar();
   drawHUD();
+  checkCollisions();
+
+  if (crashed) {
+    drawCrashScreen();
+    requestAnimationFrame(frame);
+    return;
+  }
 
   if (paused) {
     drawPauseMenu();
