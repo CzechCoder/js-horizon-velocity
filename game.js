@@ -82,7 +82,7 @@ trafficCarImage.src = "image/traffic_car_am.png";
 
 const trafficCars = [];
 
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 15; i++) {
   trafficCars.push({
     z: i * 800 + 1000,
     lane: Math.floor(Math.random() * 3),
@@ -306,10 +306,19 @@ function drawTrafficCars() {
     const projected = project(car.z);
     if (!projected) continue;
 
-    const worldX = getLaneWorldX(car.lane);
+    // Get the world X of the traffic car based on its lane
+    let worldX;
+    if (car.lane === 0) {
+      worldX = getLaneWorldX(car.lane) + 350;
+    } else if (car.lane === 2) {
+      worldX = getLaneWorldX(car.lane) - 350;
+    } else worldX = getLaneWorldX(car.lane);
+
+    // Project the world X to screen coordinates
     const scale = CAMERA_DEPTH / (car.z - position);
     const screenX = canvas.width / 2 + scale * worldX;
 
+    // Use proper scaling for car width/height
     const carHeight = scale * 450;
     const carWidth =
       carHeight * (trafficCarImage.width / trafficCarImage.height);
@@ -320,7 +329,7 @@ function drawTrafficCars() {
     if (screenY >= canvas.height / 2) {
       ctx.drawImage(
         trafficCarImage,
-        screenX - carWidth / 2,
+        screenX - carWidth / 2, // This ensures the car is centered in the lane
         screenY - carHeight,
         carWidth,
         carHeight
