@@ -43,6 +43,10 @@ let cloudOffset = 0;
 let skylineOffset = 0;
 let treeOffset = 0;
 
+// Arrays
+const trees = [];
+const trafficCars = [];
+
 // Car
 const carSpeed = 10;
 const carWidth = 350;
@@ -50,25 +54,31 @@ const carHeight = 188;
 let carX = VIRTUAL_WIDTH / 2;
 
 // Bitmap graphics
+function loadImage(src) {
+  const img = new Image();
+  img.src = src;
+  return img;
+}
+
 const carImages = {
-  straight: new Image(),
-  left: new Image(),
-  right: new Image(),
+  straight: loadImage("image/car_am.png"),
+  left: loadImage("image/car_am_left.png"),
+  right: loadImage("image/car_am_right.png"),
 };
 
-carImages.straight.src = "image/car_am.png";
-carImages.left.src = "image/car_am_left.png";
-carImages.right.src = "image/car_am_right.png";
+const logoImage = loadImage("image/shvt_logo.png");
+
+const treeImage = loadImage("image/tree.png");
+
+const trafficCarImage = loadImage("image/traffic_car_am.png");
+
+const cloudImage = loadImage("image/bg_sky.png");
+
+const skylineImage = loadImage("image/bg_back.png");
+
+const bgTreesImage = loadImage("image/bg_front.png");
 
 let currentCarImage = carImages.straight;
-
-const logoImage = new Image();
-logoImage.src = "image/shvt_logo.png";
-
-const treeImage = new Image();
-treeImage.src = "image/tree.png";
-
-const trees = [];
 
 for (let i = 0; i < 100; i++) {
   trees.push({
@@ -77,26 +87,12 @@ for (let i = 0; i < 100; i++) {
   });
 }
 
-const trafficCarImage = new Image();
-trafficCarImage.src = "image/traffic_car_am.png";
-
-const trafficCars = [];
-
 for (let i = 0; i < 15; i++) {
   trafficCars.push({
     z: i * 800 + 1000,
     lane: Math.floor(Math.random() * 3),
   });
 }
-
-const cloudImage = new Image();
-cloudImage.src = "image/bg_sky.png";
-
-const skylineImage = new Image();
-skylineImage.src = "image/bg_back.png";
-
-const bgTreesImage = new Image();
-bgTreesImage.src = "image/bg_front.png";
 
 // Project function to project road segments
 function project(z) {
@@ -118,41 +114,27 @@ function project(z) {
   return { x, y: roadY, width };
 }
 
-function drawParallaxBackground(dt) {
-  // Scroll speeds
-  cloudOffset -= dt * 10;
-  skylineOffset = 0;
-  treeOffset = 0;
-
-  // Repeat horizontally
+function drawParallaxElement(image, offset, yPosition, height) {
   const repeatWidth = canvas.width;
-
-  // Clouds (slowest)
   for (
-    let x = (cloudOffset % repeatWidth) - repeatWidth;
+    let x = (offset % repeatWidth) - repeatWidth;
     x < canvas.width;
     x += repeatWidth
   ) {
-    ctx.drawImage(cloudImage, x, 0, repeatWidth, canvas.height / 2);
+    ctx.drawImage(image, x, yPosition, repeatWidth, height);
   }
+}
 
-  // City skyline
-  for (
-    let x = (skylineOffset % repeatWidth) - repeatWidth;
-    x < canvas.width;
-    x += repeatWidth
-  ) {
-    ctx.drawImage(skylineImage, x, canvas.height / 2 - 150, repeatWidth, 150);
-  }
-
-  // Background trees
-  for (
-    let x = (1200 % repeatWidth) - repeatWidth;
-    x < canvas.width;
-    x += repeatWidth
-  ) {
-    ctx.drawImage(bgTreesImage, x, canvas.height / 2 - 188, repeatWidth, 188);
-  }
+function drawParallaxBackground(dt) {
+  cloudOffset -= dt * 10;
+  drawParallaxElement(cloudImage, cloudOffset, 0, canvas.height / 2);
+  drawParallaxElement(
+    skylineImage,
+    skylineOffset,
+    canvas.height / 2 - 150,
+    150
+  );
+  drawParallaxElement(bgTreesImage, treeOffset, canvas.height / 2 - 188, 188);
 }
 
 // Draw each segment of the road
@@ -255,42 +237,40 @@ function drawRoad() {
   }
 }
 
+function sortByZPosition(objects) {
+  return objects.sort((a, b) => b.z - a.z);
+}
+
+function drawObject(image, x, y, width, height) {
+  ctx.drawImage(image, x, y, width, height);
+}
+
+function drawTree(tree) {
+  const dz = tree.z - position;
+  if (dz < 0) return;
+
+  const scale = CAMERA_DEPTH / dz;
+  const screenX = canvas.width / 2 + scale * tree.x * 1.5;
+  const screenY = canvas.height / 2 + scale * CAMERA_HEIGHT;
+  const treeHeight = scale * 3000;
+  const treeWidth = treeHeight * (treeImage.width / treeImage.height);
+
+  drawObject(
+    treeImage,
+    screenX - treeWidth / 2,
+    screenY - treeHeight,
+    treeWidth,
+    treeHeight
+  );
+}
+
 // Draw trees
 function drawTrees() {
-  const sortedTrees = [...trees].sort((a, b) => {
-    const dzA = a.z - position;
-    const dzB = b.z - position;
-
-    if (dzA <= 0 || dzB <= 0) return 0;
-
-    const scaleA = CAMERA_DEPTH / dzA;
-    const scaleB = CAMERA_DEPTH / dzB;
-
-    const screenYA = canvas.height / 2 + scaleA * CAMERA_HEIGHT;
-    const screenYB = canvas.height / 2 + scaleB * CAMERA_HEIGHT;
-
-    return screenYA - screenYB;
-  });
+  const sortedTrees = sortByZPosition(trees);
 
   // Draw trees after sorting
   for (const tree of sortedTrees) {
-    const dz = tree.z - position;
-    if (dz < 0) continue;
-
-    const scale = CAMERA_DEPTH / dz;
-    const screenX = canvas.width / 2 + scale * tree.x * 1.5;
-    const screenY = canvas.height / 2 + scale * CAMERA_HEIGHT;
-
-    const treeHeight = scale * 3000;
-    const treeWidth = treeHeight * (treeImage.width / treeImage.height);
-
-    ctx.drawImage(
-      treeImage,
-      screenX - treeWidth / 2,
-      screenY - treeHeight,
-      treeWidth,
-      treeHeight
-    );
+    drawTree(tree);
   }
 }
 
@@ -300,7 +280,7 @@ function getLaneWorldX(laneIndex) {
 }
 
 function drawTrafficCars() {
-  const sortedTraffic = [...trafficCars].sort((a, b) => b.z - a.z);
+  const sortedTraffic = sortByZPosition(trafficCars);
 
   for (let car of sortedTraffic) {
     const projected = project(car.z);
@@ -327,7 +307,7 @@ function drawTrafficCars() {
 
     // Only render the car if it's on or below the horizon
     if (screenY >= canvas.height / 2) {
-      ctx.drawImage(
+      drawObject(
         trafficCarImage,
         screenX - carWidth / 2, // This ensures the car is centered in the lane
         screenY - carHeight,
@@ -382,23 +362,34 @@ function drawCrashScreen() {
   );
 }
 
+function drawText(
+  text,
+  x,
+  y,
+  font = "28px sans-serif",
+  color = "white",
+  alignment = "left"
+) {
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = alignment;
+  ctx.fillText(text, x, y);
+}
+
 function drawHUD() {
-  ctx.font = "28px sans-serif";
-  ctx.textAlign = "left";
+  drawText("Time:", 40, 50, "28px sans-serif", "black");
+  drawText(formatTime(elapsedTime), 120, 50, "28px sans-serif", "white");
 
-  ctx.fillStyle = "black";
-  ctx.fillText("Time:", 40, 50);
-  ctx.fillStyle = "white";
-  ctx.fillText(formatTime(elapsedTime), 120, 50);
+  drawText("Score:", 220, 50, "28px sans-serif", "black");
+  drawText(score.toString(), 310, 50, "28px sans-serif", "white");
 
-  ctx.fillStyle = "black";
-  ctx.fillText("Score:", 220, 50);
-  ctx.fillStyle = "white";
-  ctx.fillText(score.toString(), 310, 50);
-
-  ctx.fillStyle = "#bcbcbc";
-  ctx.font = "15px arial";
-  ctx.fillText("Made by Tomas Burian, 2025", 40, canvas.height - 20);
+  drawText(
+    "Made by Tomas Burian, 2025",
+    40,
+    canvas.height - 20,
+    "15px arial",
+    "#bcbcbc"
+  );
 
   const logoHeight = 80;
   const logoWidth = logoHeight * (logoImage.width / logoImage.height);
@@ -433,17 +424,27 @@ document.addEventListener("keydown", (e) => {
 
 document.addEventListener("keyup", (e) => (keys[e.key] = false));
 
-function handleInput(dt) {
-  const turningLeft = keys["ArrowLeft"] || keys["a"];
-  const turningRight = keys["ArrowRight"] || keys["d"];
+const keyMap = {
+  ArrowLeft: "left",
+  a: "left",
+  ArrowRight: "right",
+  d: "right",
+};
 
-  if (turningLeft) {
-    carX -= carSpeed * dt * 60;
-    currentCarImage = carImages.left;
-  } else if (turningRight) {
-    carX += carSpeed * dt * 60;
-    currentCarImage = carImages.right;
-  } else {
+function handleInput(dt) {
+  for (let key in keyMap) {
+    if (keys[key]) {
+      if (keyMap[key] === "left") {
+        carX -= carSpeed * dt * 60;
+        currentCarImage = carImages.left;
+      } else if (keyMap[key] === "right") {
+        carX += carSpeed * dt * 60;
+        currentCarImage = carImages.right;
+      }
+    }
+  }
+
+  if (!keys["ArrowLeft"] && !keys["a"] && !keys["ArrowRight"] && !keys["d"]) {
     currentCarImage = carImages.straight;
   }
 }
