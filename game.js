@@ -34,16 +34,16 @@ const CAMERA_HEIGHT = 800;
 const SPEED = 800; // Units per second
 
 // Game variables
-let position = 0; // Camera position
+let position = 0;
 let elapsedTime = 0; // Seconds
 let score = 0;
-let paused = false; // Game is paused?
+let paused = false;
 
 // Car
 const carSpeed = 10;
 const carWidth = 350;
 const carHeight = 188;
-let carX = VIRTUAL_WIDTH / 2; // Car's horizontal position
+let carX = VIRTUAL_WIDTH / 2;
 
 // Bitmap graphics
 const carImages = {
@@ -68,8 +68,8 @@ const trees = [];
 
 for (let i = 0; i < 100; i++) {
   trees.push({
-    z: i * 200, // Position along the road, controls density
-    x: i % 2 === 0 ? -3000 : 3000, // Left or right side of the road, adjust the number to move them further or closer to the road
+    z: i * 200,
+    x: i % 2 === 0 ? -3000 : 3000,
   });
 }
 
@@ -80,29 +80,29 @@ const trafficCars = [];
 
 for (let i = 0; i < 10; i++) {
   trafficCars.push({
-    z: i * 800 + 1000, // Always start ahead of the player
-    lane: Math.floor(Math.random() * 3), // Based on the number of lanes (1 -3)
+    z: i * 800 + 1000,
+    lane: Math.floor(Math.random() * 3),
   });
 }
 
 // Project function to project road segments
 function project(z) {
-  const dz = Math.max(z - position, 0.01); // Calculate point distance from the camera position (distance from the camera)
+  const dz = Math.max(z - position, 0.01);
 
-  if (dz <= 0.01) return null; // Avoid dividing by zero or negative distances
+  if (dz <= 0.01) return null;
 
-  const scale = CAMERA_DEPTH / dz; // Perspective key, points farther away get smaller in scale (perspective scaling)
+  const scale = CAMERA_DEPTH / dz;
 
   // Camera's horizontal and vertical position
   const x = canvas.width / 2;
-  const y = canvas.height / 2 + scale * CAMERA_HEIGHT; // Pulls close segments down
+  const y = canvas.height / 2 + scale * CAMERA_HEIGHT;
 
-  const clampedScale = Math.max(scale, 0.0005); // Clamp minimum scale so road doesn't flicker at bottom
-  const width = clampedScale * ROAD_WIDTH; // Road narrows into the distance
+  const clampedScale = Math.max(scale, 0.0005);
+  const width = clampedScale * ROAD_WIDTH;
 
-  const roadY = y - 18; // Calculate how far the road reaches down the screen
+  const roadY = y - 18;
 
-  return { x, y: roadY, width }; // Ensure the road doesn't disappear above the horizon, just stretches to the bottom
+  return { x, y: roadY, width };
 }
 
 // Draw each segment of the road
@@ -207,12 +207,11 @@ function drawRoad() {
 
 // Draw trees
 function drawTrees() {
-  // Create a copy of the trees array and sort them by projected y position
   const sortedTrees = [...trees].sort((a, b) => {
     const dzA = a.z - position;
     const dzB = b.z - position;
 
-    if (dzA <= 0 || dzB <= 0) return 0; // Skip trees behind the camera
+    if (dzA <= 0 || dzB <= 0) return 0;
 
     const scaleA = CAMERA_DEPTH / dzA;
     const scaleB = CAMERA_DEPTH / dzB;
@@ -220,19 +219,19 @@ function drawTrees() {
     const screenYA = canvas.height / 2 + scaleA * CAMERA_HEIGHT;
     const screenYB = canvas.height / 2 + scaleB * CAMERA_HEIGHT;
 
-    return screenYA - screenYB; // Sort based on vertical position
+    return screenYA - screenYB;
   });
 
   // Draw trees after sorting
   for (const tree of sortedTrees) {
     const dz = tree.z - position;
-    if (dz < 0) continue; // Skip trees behind the camera
+    if (dz < 0) continue;
 
     const scale = CAMERA_DEPTH / dz;
-    const screenX = canvas.width / 2 + scale * tree.x * 1.5; // Adjustable distance
+    const screenX = canvas.width / 2 + scale * tree.x * 1.5;
     const screenY = canvas.height / 2 + scale * CAMERA_HEIGHT;
 
-    const treeHeight = scale * 3000; // Adjustable tree height
+    const treeHeight = scale * 3000;
     const treeWidth = treeHeight * (treeImage.width / treeImage.height);
 
     ctx.drawImage(
@@ -253,25 +252,24 @@ function getLaneWorldX(laneIndex) {
 
   const startX = -ROAD_WIDTH / 2 + ROAD_WIDTH * rumbleFraction;
 
-  return startX + laneWidth * (laneIndex + 0.5); // Center of the lane
+  return startX + laneWidth * (laneIndex + 0.5);
 }
 
 function drawTrafficCars() {
   const sortedTraffic = [...trafficCars].sort((a, b) => b.z - a.z);
 
   for (let car of sortedTraffic) {
-    const projected = project(car.z); // Project the car position
+    const projected = project(car.z);
     if (!projected) continue;
 
     const worldX = getLaneWorldX(car.lane);
     const scale = CAMERA_DEPTH / (car.z - position);
     const screenX = canvas.width / 2 + scale * worldX;
 
-    const carHeight = scale * 450; // Scale the car based on distance
+    const carHeight = scale * 450;
     const carWidth =
       carHeight * (trafficCarImage.width / trafficCarImage.height);
 
-    // Adjust the car's Y position using the same logic for the road (projected.y)
     const screenY = projected.y;
 
     // Only render the car if it's on or below the horizon
@@ -317,25 +315,21 @@ function drawHUD() {
   ctx.font = "28px sans-serif";
   ctx.textAlign = "left";
 
-  // Time label
   ctx.fillStyle = "black";
   ctx.fillText("Time:", 40, 50);
   ctx.fillStyle = "white";
   ctx.fillText(formatTime(elapsedTime), 120, 50);
 
-  // Score label
   ctx.fillStyle = "black";
   ctx.fillText("Score:", 220, 50);
   ctx.fillStyle = "white";
   ctx.fillText(score.toString(), 310, 50);
 
-  // "Made by" label
   ctx.fillStyle = "#bcbcbc";
   ctx.font = "15px arial";
   ctx.fillText("Made by Tomas Burian, 2025", 40, canvas.height - 20);
 
-  // Logo
-  const logoHeight = 80; // Adjustable logo height
+  const logoHeight = 80;
   const logoWidth = logoHeight * (logoImage.width / logoImage.height);
   ctx.drawImage(
     logoImage,
@@ -352,7 +346,6 @@ function formatTime(seconds) {
   return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
 }
 
-// Listeners
 const keys = {};
 
 document.addEventListener("keydown", (e) => {
@@ -363,7 +356,6 @@ document.addEventListener("keydown", (e) => {
 });
 document.addEventListener("keyup", (e) => (keys[e.key] = false));
 
-// Controls
 function handleInput(dt) {
   const turningLeft = keys["ArrowLeft"] || keys["a"];
   const turningRight = keys["ArrowRight"] || keys["d"];
@@ -395,7 +387,6 @@ function frame(time) {
   const dt = (time - lastTime) / 1000;
   lastTime = time;
 
-  // Clear frame
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   drawBackground();
@@ -412,12 +403,12 @@ function frame(time) {
   }
 
   elapsedTime += dt;
-  score += Math.floor(SPEED * dt * 0.1); // Last number is multiplier
+  score += Math.floor(SPEED * dt * 0.1);
   position += SPEED * dt;
 
   for (let tree of trees) {
     if (tree.z < position) {
-      tree.z += 20000; // Move the tree far ahead, adjust this value to match tree spacing
+      tree.z += 20000;
     }
   }
 
@@ -435,5 +426,3 @@ function frame(time) {
 }
 
 requestAnimationFrame(frame);
-
-// original code
