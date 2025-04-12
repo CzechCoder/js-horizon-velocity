@@ -38,6 +38,9 @@ let position = 0;
 let elapsedTime = 0; // Seconds
 let score = 0;
 let paused = false;
+let cloudOffset = 0;
+let skylineOffset = 0;
+let treeOffset = 0;
 
 // Car
 const carSpeed = 10;
@@ -85,6 +88,15 @@ for (let i = 0; i < 10; i++) {
   });
 }
 
+const cloudImage = new Image();
+cloudImage.src = "image/bg_sky.png";
+
+const skylineImage = new Image();
+skylineImage.src = "image/bg_back.png";
+
+const bgTreesImage = new Image();
+bgTreesImage.src = "image/bg_front.png";
+
 // Project function to project road segments
 function project(z) {
   const dz = Math.max(z - position, 0.01);
@@ -103,6 +115,43 @@ function project(z) {
   const roadY = y - 18;
 
   return { x, y: roadY, width };
+}
+
+function drawParallaxBackground(dt) {
+  // Scroll speeds
+  cloudOffset -= dt * 10;
+  skylineOffset = 0;
+  treeOffset = 0;
+
+  // Repeat horizontally
+  const repeatWidth = canvas.width;
+
+  // Clouds (slowest)
+  for (
+    let x = (cloudOffset % repeatWidth) - repeatWidth;
+    x < canvas.width;
+    x += repeatWidth
+  ) {
+    ctx.drawImage(cloudImage, x, 0, repeatWidth, canvas.height / 2);
+  }
+
+  // City skyline
+  for (
+    let x = (skylineOffset % repeatWidth) - repeatWidth;
+    x < canvas.width;
+    x += repeatWidth
+  ) {
+    ctx.drawImage(skylineImage, x, canvas.height / 2 - 150, repeatWidth, 150);
+  }
+
+  // Background trees
+  for (
+    let x = (1200 % repeatWidth) - repeatWidth;
+    x < canvas.width;
+    x += repeatWidth
+  ) {
+    ctx.drawImage(bgTreesImage, x, canvas.height / 2 - 188, repeatWidth, 188);
+  }
 }
 
 // Draw each segment of the road
@@ -390,6 +439,7 @@ function frame(time) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   drawBackground();
+  drawParallaxBackground(dt);
   drawTrees();
   drawRoad();
   drawTrafficCars();
